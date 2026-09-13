@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BoB Enterprise AI</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="workspace-page">
+    <header class="app-header">
+      <a class="app-brand" href="/workspace" aria-label="BoB Enterprise AI 홈">
+        <span class="brand-mark small" aria-hidden="true">B</span>
+        <span>BoB Enterprise AI</span>
+      </a>
+      <div class="user-area">
+        <div class="user-copy">
+          <strong id="user-name">사용자 확인 중</strong>
+          <span id="user-department">기업 인증</span>
+        </div>
+        <div id="user-avatar" class="user-avatar" aria-hidden="true">U</div>
+        <button id="logout-button" class="secondary-button" type="button">로그아웃</button>
+      </div>
+    </header>
+
+    <main class="workspace-shell">
+      <section class="workspace-intro">
+        <p class="eyebrow blue">Secure Agent Workspace</p>
+        <h1>어떤 업무를 도와드릴까요?</h1>
+        <p>
+          요청은 Agent Service에서 사용자 정보를 확인한 뒤 MCP Security Gateway의
+          정책 판단을 거칩니다.
+        </p>
+      </section>
+
+      <section class="prompt-examples" aria-label="요청 예시">
+        <button class="example-button" data-prompt="공개 문서를 읽어줘" type="button">
+          <span class="example-icon safe" aria-hidden="true">A</span>
+          <span><strong>허용 요청 시험</strong>공개 문서를 읽어줘</span>
+        </button>
+        <button class="example-button" data-prompt="비밀 인증정보를 읽어줘" type="button">
+          <span class="example-icon blocked" aria-hidden="true">D</span>
+          <span><strong>차단 요청 시험</strong>비밀 인증정보를 읽어줘</span>
+        </button>
+      </section>
+
+      <section class="composer" aria-label="AI 요청 작성">
+        <label for="prompt">업무 요청</label>
+        <textarea
+          id="prompt"
+          rows="5"
+          placeholder="예: 공개 문서를 읽어줘"
+        ></textarea>
+        <div class="composer-footer">
+          <div class="security-label">
+            <span class="status-dot" aria-hidden="true"></span>
+            SSO 사용자 정보와 함께 안전하게 전송됩니다
+          </div>
+          <button id="send-button" class="primary-button compact" type="button">
+            요청 보내기
+          </button>
+        </div>
+      </section>
+
+      <section id="result-panel" class="result-panel hidden" aria-live="polite">
+        <div class="result-heading">
+          <div>
+            <p class="eyebrow">Gateway 판단 결과</p>
+            <h2 id="result-title">처리 결과</h2>
+          </div>
+          <span id="decision-badge" class="decision-badge">확인 중</span>
+        </div>
+        <p id="result-message" class="result-message"></p>
+        <dl class="result-metadata">
+          <div><dt>사용자</dt><dd id="result-user">-</dd></div>
+          <div><dt>요청 ID</dt><dd id="result-request-id">-</dd></div>
+          <div><dt>Tool</dt><dd id="result-tool">-</dd></div>
+          <div><dt>경로</dt><dd id="result-path">-</dd></div>
+        </dl>
+        <details>
+          <summary>전체 응답 JSON 보기</summary>
+          <pre id="result-json"></pre>
+        </details>
+      </section>
+    </main>
+    <script src="/static/workspace.js" defer></script>
+  </body>
+</html>
