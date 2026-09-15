@@ -43,11 +43,14 @@ app.mount(
 )
 
 
-class ChatRequest(BaseModel):
-    message: str
+class AgentToolCallRequest(BaseModel):
+    session_id: str
+    server_id: str
+    tool_name: str
+    arguments: dict
 
 
-class ChatResponse(BaseModel):
+class AgentToolCallResponse(BaseModel):
     request_id: str
     session_id: str
     status: str
@@ -72,6 +75,7 @@ class UserProfile(BaseModel):
 class MockLoginResponse(BaseModel):
     access_token: str
     token_type: str
+    session_id: str
     user: UserProfile
 
 
@@ -82,6 +86,8 @@ TEST_USER = UserProfile(
     department="보안기술팀",
     roles=["analyst"],
 )
+
+ACTIVE_SESSIONS: dict[str, str] = {}
 
 
 @app.get("/", include_in_schema=False)
@@ -144,11 +150,15 @@ async def mock_login(
             detail="회사 계정 또는 비밀번호를 확인해주세요.",
         )
 
+    session_id = str(uuid.uuid4())
+    ACTIVE_SESSIONS[session_id] = TEST_USER.user_id
+
     print(
         {
             "event": "mock_sso_login_succeeded",
             "user_id": TEST_USER.user_id,
             "email": TEST_USER.email,
+            "session_id": session_id,
         },
         flush=True,
     )
@@ -156,6 +166,7 @@ async def mock_login(
     return MockLoginResponse(
         access_token=TEST_USER_TOKEN,
         token_type="bearer",
+        session_id=session_id,
         user=TEST_USER,
     )
 
@@ -167,62 +178,50 @@ async def current_user(
     return authenticate(authorization)
 
 
-def create_temporary_tool_call(message: str) -> dict:
-    """
-    LLM을 연결하기 전 사용하는 임시 변환 로직이다.
-    실제 보안 판정 로직이 아니다.
-    """
+def validate_session(user: UserProfile, session_id: str) -> None:
+    session_user_id = ACTIVE_SESSIONS.get(session_id)
 
-    normalized_message = message.strip()
-
-    if normalized_message == "공개 문서를 읽어줘":
-        path = "/data/public/notice.txt"
-    elif normalized_message == "비밀 인증정보를 읽어줘":
-        path = "/data/sensitive/secret.txt"
-    else:
-        path = "/data/unsupported/request.txt"
-
-    return {
-        "server_id": "file-mcp",
-        "tool_name": "read_file",
-        "arguments": {
-            "path": path,
-        },
-    }
+    if session_user_id != user.user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="유효하지 않거나 만료된 세션",
+        )
 
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat(
-    request: ChatRequest,
+@app.post(
+    "/agent/tool-call",
+    response_model=AgentToolCallResponse,
+)
+async def forward_tool_call(
+    request: AgentToolCallRequest,
     authorization: str | None = Header(default=None),
-) -> ChatResponse:
+) -> AgentToolCallResponse:
     user = authenticate(authorization)
+    validate_session(user, request.session_id)
     user_id = user.user_id
 
     request_id = str(uuid.uuid4())
-    session_id = str(uuid.uuid4())
     tool_call_id = str(uuid.uuid4())
-
-    tool_call = create_temporary_tool_call(request.message)
 
     gateway_request = {
         "request_id": request_id,
-        "session_id": session_id,
+        "session_id": request.session_id,
         "user_id": user_id,
         "agent_id": "document-agent-test",
-        "server_id": tool_call["server_id"],
+        "server_id": request.server_id,
         "tool_call_id": tool_call_id,
-        "tool_name": tool_call["tool_name"],
-        "arguments": tool_call["arguments"],
+        "tool_name": request.tool_name,
+        "arguments": request.arguments,
     }
 
     print(
         {
-            "event": "request_received",
+            "event": "authenticated_tool_call_received",
             "request_id": request_id,
-            "session_id": session_id,
+            "session_id": request.session_id,
             "user_id": user_id,
-            "message": request.message,
+            "server_id": request.server_id,
+            "tool_name": request.tool_name,
         },
         flush=True,
     )
@@ -265,14 +264,16 @@ async def chat(
             "Gateway가 Tool Call을 차단했습니다."
         )
 
-    return ChatResponse(
+    return AgentToolCallResponse(
         request_id=request_id,
-        session_id=session_id,
+        session_id=request.session_id,
         status=status,
         message=response_message,
         tool_call={
             "tool_call_id": tool_call_id,
-            **tool_call,
+            "server_id": request.server_id,
+            "tool_name": request.tool_name,
+            "arguments": request.arguments,
         },
         gateway_result=gateway_result,
     )

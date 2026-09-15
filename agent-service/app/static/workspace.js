@@ -1,5 +1,7 @@
 const TOKEN_KEY = "bob_mock_sso_token";
+const SESSION_KEY = "bob_mock_sso_session";
 const token = sessionStorage.getItem(TOKEN_KEY);
+const sessionId = sessionStorage.getItem(SESSION_KEY);
 
 const promptInput = document.querySelector("#prompt");
 const sendButton = document.querySelector("#send-button");
@@ -8,11 +10,12 @@ let currentUser = null;
 
 function redirectToLogin() {
   sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
   window.location.replace("/login");
 }
 
 async function loadCurrentUser() {
-  if (!token) {
+  if (!token || !sessionId) {
     redirectToLogin();
     return;
   }
@@ -55,10 +58,10 @@ function renderResult(body) {
   resultPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-async function sendPrompt() {
-  const message = promptInput.value.trim();
+async function sendToolCall() {
+  const path = promptInput.value.trim();
 
-  if (!message) {
+  if (!path) {
     promptInput.focus();
     return;
   }
@@ -67,13 +70,18 @@ async function sendPrompt() {
   sendButton.textContent = "정책 확인 중";
 
   try {
-    const response = await fetch("/chat", {
+    const response = await fetch("/agent/tool-call", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        session_id: sessionId,
+        server_id: "file-mcp",
+        tool_name: "read_file",
+        arguments: { path },
+      }),
     });
 
     if (response.status === 401) {
@@ -102,16 +110,16 @@ async function sendPrompt() {
 
 document.querySelectorAll(".example-button").forEach((button) => {
   button.addEventListener("click", () => {
-    promptInput.value = button.dataset.prompt;
+    promptInput.value = button.dataset.path;
     promptInput.focus();
   });
 });
 
 document.querySelector("#logout-button").addEventListener("click", redirectToLogin);
-sendButton.addEventListener("click", sendPrompt);
+sendButton.addEventListener("click", sendToolCall);
 promptInput.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-    sendPrompt();
+    sendToolCall();
   }
 });
 

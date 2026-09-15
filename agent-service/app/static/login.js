@@ -1,4 +1,5 @@
 const TOKEN_KEY = "bob_mock_sso_token";
+const SESSION_KEY = "bob_mock_sso_session";
 
 const form = document.querySelector("#login-form");
 const emailInput = document.querySelector("#email");
@@ -7,7 +8,10 @@ const loginButton = document.querySelector("#login-button");
 const errorMessage = document.querySelector("#login-error");
 const togglePassword = document.querySelector("#toggle-password");
 
-if (sessionStorage.getItem(TOKEN_KEY)) {
+if (
+  sessionStorage.getItem(TOKEN_KEY) &&
+  sessionStorage.getItem(SESSION_KEY)
+) {
   window.location.replace("/workspace");
 }
 
@@ -50,6 +54,7 @@ form.addEventListener("submit", async (event) => {
     }
 
     sessionStorage.setItem(TOKEN_KEY, body.access_token);
+    sessionStorage.setItem(SESSION_KEY, body.session_id);
     window.location.assign("/workspace");
   } catch (error) {
     errorMessage.textContent = error.message;
